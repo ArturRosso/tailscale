@@ -35,15 +35,20 @@ func isUp(nif *net.Interface) bool       { return nif.Flags&net.FlagUp != 0 }
 func isLoopback(nif *net.Interface) bool { return nif.Flags&net.FlagLoopback != 0 }
 
 func isProblematicInterface(nif *net.Interface) bool {
-	name := nif.Name
-	// Don't try to send disco/etc packets over zerotier; they effectively
-	// DoS each other by doing traffic amplification, both of them
-	// preferring/trying to use each other for transport. See:
-	// https://github.com/tailscale/tailscale/issues/1208
-	if strings.HasPrefix(name, "zt") || (runtime.GOOS == "windows" && strings.Contains(name, "ZeroTier")) {
-		return true
-	}
-	return false
+
+    name := nif.Name
+
+    // Lista de prefixos problem  ticos
+    problematicPrefixes := []string{"zt", "ppp", "ipoe", "ath"}
+
+    // Verifica se o nome da interface come  a com algum dos prefixos problem  ticos
+    for _, prefix := range problematicPrefixes {
+        if strings.HasPrefix(name, prefix) {
+            return true
+        }
+    }
+
+    return false
 }
 
 // LocalAddresses returns the machine's IP addresses, separated by
@@ -203,6 +208,9 @@ func ForeachInterface(fn func(Interface, []netip.Prefix)) error {
 // the interface, and Bits are the subnet mask.
 func (ifaces InterfaceList) ForeachInterface(fn func(Interface, []netip.Prefix)) error {
 	for _, iface := range ifaces {
+                if isProblematicInterface(iface.Interface) {
+                        continue
+                }
 		addrs, err := iface.Addrs()
 		if err != nil {
 			return err
